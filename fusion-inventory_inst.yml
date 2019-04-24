@@ -1,0 +1,89 @@
+### varg@host4.biz
+### Installation FusionInventory plugin for GLPI
+### Version 1.0
+---
+- hosts: "{{ hosts }}"
+  tasks:
+### Debug tasks
+      - name: ping hosts
+        ping:
+
+      - name: Check OS
+        debug: msg={{ansible_distribution}}-{{ansible_distribution_version}}
+### Debian 8,9, Ubuntu
+      - name: Debian/Ubuntu Update cache running
+        apt:
+         update_cache: yes
+         cache_valid_time: 3600
+        when: ansible_os_family == "Debian"
+
+      - name: Debian/Ubuntu Install dependencies
+        apt:
+         name: "{{ packages }}"
+        vars:
+         packages:
+         - dmidecode
+         - hwdata
+         - ucf
+         - hdparm
+         - perl
+         - libuniversal-require-perl
+         - libwww-perl
+         - libparse-edid-perl
+         - libproc-daemon-perl
+         - libfile-which-perl
+         - libhttp-daemon-perl
+         - libxml-treepp-perl
+         - libyaml-perl
+         - libnet-cups-perl
+         - libnet-ip-perl
+         - libdigest-sha-perl
+         - libsocket-getaddrinfo-perl
+         - libtext-template-perl
+        when: ansible_os_family == "Debian"
+
+      - name: Debian/Ubuntu Install Deb fusioninventory-agent_2.5-1
+        apt:
+         deb: http://debian.fusioninventory.org/downloads/fusioninventory-agent_2.5-1_all.deb
+        when: ansible_os_family == "Debian"
+### CentOS 7
+      - name: CentOS Install trasher/fusioninventory-agent repo
+        yum_repository:
+          name: fusioninventory-agent
+          description: Copr repo for fusioninventory-agent owned by trasher
+          baseurl: https://copr-be.cloud.fedoraproject.org/results/trasher/fusioninventory-agent/epel-7-$basearch/
+          enabled: yes
+          gpgcheck: 1
+          gpgkey: https://copr-be.cloud.fedoraproject.org/results/trasher/fusioninventory-agent/pubkey.gpg
+        when: ansible_os_family == "RedHat"
+
+      - name: CentOS Install fusioninventory-agent & fusioninventory-agent-task-inventory
+        yum:
+          name: "{{ packages }}"
+        vars:
+          packages:
+          - fusioninventory-agent
+          - fusioninventory-agent-task-inventory
+        when: ansible_os_family == "RedHat"
+### Configuration
+      - name: Create config file
+        file:
+          path: /etc/fusioninventory/conf.d/agent.cfg
+          state: touch
+          owner: root
+          group: root
+          mode: 0644
+
+      - name: Update config file
+        blockinfile:
+          dest: /etc/fusioninventory/conf.d/agent.cfg
+          block: |
+            server = http://glpi.example.com/plugins/fusioninventory/
+            local = /tmp
+### Check and restart systemd service fusioninventory-agent
+      - name: Restart & Enable systemd service fusioninventory-agent
+        systemd:
+          state: restarted
+          daemon_reload: yes
+          enabled: yes
+          name: fusioninventory-agent
